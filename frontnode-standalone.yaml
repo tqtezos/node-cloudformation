@@ -51,7 +51,7 @@
   
     NodeGitHubBranch:
       Type: String
-      Default: master
+      Default: alphanet
       Description: The branch of the node repo to continuously deploy.
   
     GitHubToken:
