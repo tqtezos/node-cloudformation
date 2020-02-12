@@ -1,0 +1,1079 @@
+---
+  AWSTemplateFormatVersion: 2010-09-09
+  
+  # Frontnode EIPs:
+  
+  # Development/Zeronet:
+  # 34.255.229.229 2a05:d018:f2:fc01:85ca:b2ed:39dc:3174
+  # 34.255.140.16 2a05:d018:f2:fc02:222a:2ad6:2230:bf1c
+  # 34.255.244.4 2a05:d018:f2:fc03:e8ff:b3c7:7305:110c
+  # 34.243.215.49 2a05:d018:f2:fc03:6146:40df:ce95:bce2
+  # 34.255.244.144 2a05:d018:f2:fc01:788d:2a64:9090:19e2
+  
+  # Staging/Alphanet:
+  # 34.249.109.84 2a05:d018:791:4602:c59e:148c:7d1a:5e2c
+  # 34.253.64.43 2a05:d018:791:4603:e008:bd0:909b:35f7
+  # 34.255.45.149 2a05:d018:791:4602:b5c6:8740:2662:e3bd
+  # 34.255.45.196 2a05:d018:791:4603:36f8:57df:5b99:4bac
+  # 52.50.125.15 2a05:d018:791:4603:3938:ca03:a3a:1a7e
+  
+  # Mainnet/Ireland:
+  # 34.246.245.155 2a05:d018:619:5802:78f7:8f07:a450:b1f3
+  # 34.250.42.106 2a05:d018:619:5802:879b:ee1e:cf1f:17a5
+  # 34.252.42.102 2a05:d018:619:5803:e823:8d86:7ef4:ef5d
+  # 34.254.102.12 2a05:d018:619:5801:fb14:d429:24a4:26e2
+  # 34.255.45.216 2a05:d018:619:5801:8e33:a3a7:f2c5:f41c
+  
+  # Mainnet/Oregon:
+  # 52.35.49.208 2600:1f14:a74:a003:884e:532b:9bbe:6179
+  # 34.214.94.76 2600:1f14:a74:a001:8021:96f4:9e6a:ac15
+  # 34.208.149.159 2600:1f14:a74:a003:d297:b833:e4ae:4d15
+  # 34.216.135.4 2600:1f14:a74:a002:e0ad:d64:e46f:935c
+  # 34.215.147.163 2600:1f14:a74:a002:6102:d29c:73bb:14d8
+  
+  Description: >
+    This template creates an automated continuous deployment pipeline to Amazon Elastic Container Service (ECS)
+    Created by Luke Youngblood, luke@blockscale.net
+  
+  Parameters:
+  
+  # GitHub Parameters
+  
+    GitHubUser:
+      Type: String
+      Default: tqtezos
+      Description: Your team or username on GitHub.
+  
+    NodeGitHubRepo:
+      Type: String
+      Default: node-docker
+      Description: The repo name of the node service.
+  
+    NodeGitHubBranch:
+      Type: String
+      Default: master
+      Description: The branch of the node repo to continuously deploy.
+  
+    GitHubToken:
+      Type: String
+      NoEcho: true
+      Description: >
+        Token for the team or user specified above. (https://github.com/settings/tokens)
+  
+  # VPC Parameters
+  
+    VPC:
+      Type: AWS::EC2::VPC::Id
+  
+    Subnets:
+      Type: List<AWS::EC2::Subnet::Id>
+  
+    VpcCIDR:
+      Type: String
+      Default: 10.200.0.0/16
+  
+  # ECS Parameters
+  
+    InstanceType:
+      Type: String
+      Default: i3.large
+  
+    KeyPair:
+      Type: AWS::EC2::KeyPair::KeyName
+  
+    SpotPrice:
+      Type: Number
+      Default: 0.172
+  
+    ClusterSize:
+      Type: Number
+      Default: 5
+  
+    Bandwidth:
+      Type: Number
+      Default: 2048
+  
+    BandwidthCeiling:
+      Type: Number
+      Default: 4096
+  
+    NodeDesiredCount:
+      Type: Number
+      Default: 0
+  
+    NodeTaskName:
+      Type: String
+      Default: tezos-node
+  
+    ECSAMI:
+      Type: AWS::SSM::Parameter::Value<String>
+      Default: /aws/service/ecs/optimized-ami/amazon-linux/recommended/image_id
+  
+  # SNS Parameters
+  
+    SNSSubscriptionEndpoint:
+      Type: String
+      Default: https://events.pagerduty.com/integration/6c1aff6f4d8b4cd79144ee95c383d6d6/enqueue
+  
+    SNSSubscriptionProtocol:
+      Type: String
+      Default: HTTPS
+  
+  # CloudWatch Alarm Parameters
+  
+    CPUAlarmThreshold:
+      Type: Number
+      Default: 80
+  
+    MemoryAlarmThreshold:
+      Type: Number
+      Default: 80
+  
+  # Tezos Parameters
+  
+    NodeAddress:
+      Type: String
+      Default: bootzero.tzbeta.net
+  
+    RpcPort:
+      Type: Number
+      Default: 8732
+  
+    NetPort:
+      Type: Number
+      Default: 9732
+  
+    Network:
+      Type: String
+      Default: alphanet
+      AllowedValues:
+        - mainnetsnapshot
+        - mainnet
+        - alphanet
+        - zeronet
+  
+  Metadata:
+  
+    AWS::CloudFormation::Interface:
+      ParameterLabels:
+        GitHubUser:
+          default: "User"
+        NodeGitHubRepo:
+          default: "Node Repo"
+        NodeGitHubBranch:
+          default: "Node Branch"
+        GitHubToken:
+          default: "Personal Access Token"
+        VPC:
+          default: "Choose which VPC the autoscaling group should be deployed to"
+        Subnets:
+          default: "Choose which subnets the autoscaling group should be deployed to"
+        VpcCIDR:
+          default: "VPC CIDR Block"
+        InstanceType:
+          default: "Which instance type should we use to build the ECS cluster?"
+        KeyPair:
+          default: "Which keypair should be used to allow SSH to the nodes?"
+        ClusterSize:
+          default: "How many ECS hosts do you want to initially deploy?"
+        SpotPrice:
+          default: "The maximum spot price to pay for instances - this should normally be set to the on demand price."
+        Bandwidth:
+          default: "How much bandwidth, in kb/sec., should be allocated to Tezos peers (upload) per EC2 instance"
+        BandwidthCeiling:
+          default: "How much bandwidth, in kb/sec., should be allocated to Tezos peers as a ceiling (max. upload)"
+        NodeDesiredCount:
+          default: "How many ECS Tasks do you want to initially execute?"
+        NodeTaskName:
+          default: "The name of the node ECS Task"
+        ECSAMI:
+          default: "The ECS AMI ID populated from SSM."
+        NodeAddress:
+          default: "The DNS hostname of the Tezos node(s)"
+        RpcPort:
+          default: "The RPC port used for communication with the local Tezos node"
+        NetPort:
+          default: "The TCP port used for connectivity to other Tezos peer nodes"
+        Network:
+          default: "The Tezos network you will be connecting to (zeronet, alphanet, or mainnet)"
+      ParameterGroups:
+        - Label:
+            default: GitHub Configuration
+          Parameters:
+            - NodeGitHubRepo
+            - NodeGitHubBranch
+            - GitHubUser
+            - GitHubToken
+        - Label:
+            default: VPC Configuration
+          Parameters:
+            - VPC
+            - Subnets
+            - VpcCIDR
+        - Label:
+            default: ECS Configuration
+          Parameters:
+            - InstanceType
+            - KeyPair
+            - SpotPrice
+            - ClusterSize
+            - Bandwidth
+            - BandwidthCeiling
+            - NodeDesiredCount
+            - NodeTaskName
+            - ECSAMI
+        - Label:
+            default: Tezos Configuration
+          Parameters:
+            - NodeAddress
+            - RpcPort
+            - NetPort
+            - Network
+        - Label:
+            default: SNS Configuration
+          Parameters:
+            - SNSSubscriptionEndpoint
+            - SNSSubscriptionProtocol
+        - Label:
+            default: CloudWatch Alarms Configuration
+          Parameters:
+            - CPUAlarmThreshold
+            - MemoryAlarmThreshold
+  
+  # Mappings
+  
+  Mappings:
+  
+    RegionMap:
+      eu-west-1:
+        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-rhoe29oxxq0c
+        mainnet: mainnet-updater-chainbucket-vwnool266emk
+        zeronet: zeronet-updater-chainbucket-kmmayerx0l8v
+        alphanet: alphanet-updater-chainbucket-1v6go885nadpa
+      eu-central-1:
+        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-pq4rbmykvmc5
+        mainnet: mainnet-updater-chainbucket-1xqr2mulio9ji
+      ap-southeast-1:
+        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-195c5u73nminm
+        mainnet: mainnet-updater-chainbucket-1sdwkmqkck157
+      ap-northeast-1:
+        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-sm0xec0cdesk
+        mainnet: mainnet-updater-chainbucket-grzvkc3i3syo
+      us-west-2:
+        mainnet: mainnet-updater-chainbucket-1eq4z7ed2l45s
+        alphanet: testnet-updater-chainbucket-167t5ylzl69jf
+      us-east-2:
+        mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
+  
+  Resources:
+  
+  # Kinesis Resources
+  
+    DeliveryStreamRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - firehose.amazonaws.com
+              Action:
+                - sts:AssumeRole
+        Policies:
+          - PolicyName: s3Access
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Sid: ''
+                  Effect: Allow
+                  Action:
+                    - s3:AbortMultipartUpload
+                    - s3:GetBucketLocation
+                    - s3:GetObject
+                    - s3:ListBucket
+                    - s3:ListBucketMultipartUploads
+                    - s3:PutObject
+                  Resource:
+                    - !Sub '${PeerAnalyticsBucket.Arn}'
+                    - !Sub '${PeerAnalyticsBucket.Arn}/*'
+                - Sid: ''
+                  Effect: Allow
+                  Action:
+                    - logs:PutLogEvents
+                  Resource:
+                    - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/*:log-stream:*'
+  
+    PeerAnalyticsStream:
+      Type: AWS::KinesisFirehose::DeliveryStream
+      Properties:
+        DeliveryStreamType: DirectPut
+        S3DestinationConfiguration:
+          BucketARN: !Sub '${PeerAnalyticsBucket.Arn}'
+          BufferingHints:
+            IntervalInSeconds: 60
+            SizeInMBs: 5
+          CompressionFormat: GZIP
+          RoleARN: !GetAtt 'DeliveryStreamRole.Arn'
+  
+    PeerAnalyticsBucket:
+      Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
+  
+  # ECS Resources
+  
+    Cluster:
+      Type: AWS::ECS::Cluster
+      Properties:
+        ClusterName: !Ref AWS::StackName
+  
+    SecurityGroup:
+      Type: "AWS::EC2::SecurityGroup"
+      Properties:
+        GroupDescription: !Sub ${AWS::StackName}-sg
+        VpcId: !Ref VPC
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: 22
+            ToPort: 22
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: !Ref RpcPort
+            ToPort: !Ref RpcPort
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: !Ref NetPort
+            ToPort: !Ref NetPort
+            CidrIp: 0.0.0.0/0
+          - IpProtocol: tcp
+            FromPort: !Ref NetPort
+            ToPort: !Ref NetPort
+            CidrIpv6: ::/0
+  
+    ECSAutoScalingGroup:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties:
+        VPCZoneIdentifier: !Ref Subnets
+        LaunchConfigurationName: !Ref ECSLaunchConfiguration
+        MinSize: !Ref ClusterSize
+        MaxSize: !Ref ClusterSize
+        DesiredCapacity: !Ref ClusterSize
+        Tags:
+          - Key: Name
+            Value: !Sub ${AWS::StackName} ECS host
+            PropagateAtLaunch: true
+      CreationPolicy:
+        ResourceSignal:
+          Timeout: PT15M
+      UpdatePolicy:
+        AutoScalingRollingUpdate:
+          MinInstancesInService: 4
+          MaxBatchSize: 1
+          PauseTime: PT15M
+          SuspendProcesses:
+            - HealthCheck
+            - ReplaceUnhealthy
+            - AZRebalance
+            - AlarmNotification
+            - ScheduledActions
+          WaitOnResourceSignals: true
+  
+    ECSLaunchConfiguration:
+      Type: AWS::AutoScaling::LaunchConfiguration
+      Properties:
+        ImageId: !Ref ECSAMI
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyPair
+        AssociatePublicIpAddress: True
+  #      SpotPrice: !Ref SpotPrice
+        SecurityGroups:
+          - !Ref SecurityGroup
+        IamInstanceProfile: !Ref ECSInstanceProfile
+        UserData:
+          "Fn::Base64": !Sub |
+            #!/bin/bash
+            yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+            yum install -y aws-cfn-bootstrap hibagent
+            yum update -y
+            restart amazon-ssm-agent
+  
+            drives=`find /dev -regextype posix-egrep -regex '.*/(sd[b-z]|xvd[b-z]|nvme[0-9]n1)'`
+            ephemeral_count=`find /dev -regextype posix-egrep -regex '.*/(sd[b-z]|xvd[b-z]|nvme[0-9]n1)'|wc -l`
+            mount_point=/var/lib/docker
+            yum -y -d0 install mdadm curl rsync
+  
+            # copy existing files from mount point
+            service docker stop
+            echo 'DOCKER_STORAGE_OPTIONS="--storage-driver overlay2"' > /etc/sysconfig/docker-storage
+            mkdir -p /tmp$mount_point
+            rsync -val $mount_point/ /tmp/$mount_point/
+            umount $mount_point
+  
+            # overwrite first few blocks in case there is a filesystem, otherwise mdadm will prompt for input
+            for drive in $drives; do
+              dd if=/dev/zero of=$drive bs=4096 count=1024
+            done
+  
+            partprobe
+            mdadm --create --force --verbose /dev/md0 --level=0 -c256 --raid-devices=$ephemeral_count $drives
+            echo DEVICE $drives | tee /etc/mdadm.conf
+            mdadm --detail --scan | tee -a /etc/mdadm.conf
+            blockdev --setra 65536 /dev/md0
+            mkfs -t ext4 /dev/md0
+            mkdir -p $mount_point
+  
+            mount -t ext4 -o noatime /dev/md0 $mount_point
+  
+            # Copy files back to new mount point
+            rsync -val /tmp/$mount_point/ $mount_point/
+            rm -rf /tmp$mount_point
+            service docker start
+  
+            # Make raid appear on reboot
+            echo "/dev/md0 $mount_point ext4 noatime 0 0" | tee -a /etc/fstab
+  
+            # Set Linux traffic control to limit outbound bandwidth usage of peering
+            #tc qdisc add dev eth0 root handle 1:0 htb default 1
+            #tc class add dev eth0 parent 1:0 classid 1:10 htb rate ${Bandwidth}kbit ceil {BandwidthCeiling}kbit prio 0
+            #tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dport 9732 0xffff flowid 1:10
+  
+            /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+            /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
+            /usr/bin/enable-ec2-spot-hibernation
+  
+            # Attach an EIP from the pool of available EIPs in scope "vpc"
+            alloc=`aws ec2 describe-addresses --region ${AWS::Region} --output text | grep -v eni | head -1 | cut -f 2`
+            instanceid=`curl 169.254.169.254/latest/meta-data/instance-id`
+            aws ec2 associate-address --region ${AWS::Region} --allocation-id $alloc --instance-id $instanceid
+  
+            # If there was a kernel update applied, reboot
+            if [ `rpm -q kernel|wc -l` -gt 1 ]
+            then
+              reboot
+            fi
+  
+      Metadata:
+        AWS::CloudFormation::Init:
+          config:
+            packages:
+              yum:
+                awslogs: []
+  
+            commands:
+              01_add_instance_to_cluster:
+                command: !Sub echo ECS_CLUSTER=${Cluster} >> /etc/ecs/ecs.config
+            files:
+              "/etc/cfn/cfn-hup.conf":
+                mode: 000400
+                owner: root
+                group: root
+                content: !Sub |
+                  [main]
+                  stack=${AWS::StackId}
+                  region=${AWS::Region}
+  
+              "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+                content: !Sub |
+                  [cfn-auto-reloader-hook]
+                  triggers=post.update
+                  path=Resources.ECSLaunchConfiguration.Metadata.AWS::CloudFormation::Init
+                  action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+  
+              "/etc/awslogs/awscli.conf":
+                content: !Sub |
+                  [plugins]
+                  cwlogs = cwlogs
+                  [default]
+                  region = ${AWS::Region}
+  
+              "/etc/awslogs/awslogs.conf":
+                content: !Sub |
+                  [general]
+                  state_file = /var/lib/awslogs/agent-state
+  
+                  [/var/log/dmesg]
+                  file = /var/log/dmesg
+                  log_group_name = ${Cluster}-/var/log/dmesg
+                  log_stream_name = ${Cluster}
+  
+                  [/var/log/messages]
+                  file = /var/log/messages
+                  log_group_name = ${Cluster}-/var/log/messages
+                  log_stream_name = ${Cluster}
+                  datetime_format = %b %d %H:%M:%S
+  
+                  [/var/log/docker]
+                  file = /var/log/docker
+                  log_group_name = ${Cluster}-/var/log/docker
+                  log_stream_name = ${Cluster}
+                  datetime_format = %Y-%m-%dT%H:%M:%S.%f
+  
+                  [/var/log/ecs/ecs-init.log]
+                  file = /var/log/ecs/ecs-init.log.*
+                  log_group_name = ${Cluster}-/var/log/ecs/ecs-init.log
+                  log_stream_name = ${Cluster}
+                  datetime_format = %Y-%m-%dT%H:%M:%SZ
+  
+                  [/var/log/ecs/ecs-agent.log]
+                  file = /var/log/ecs/ecs-agent.log.*
+                  log_group_name = ${Cluster}-/var/log/ecs/ecs-agent.log
+                  log_stream_name = ${Cluster}
+                  datetime_format = %Y-%m-%dT%H:%M:%SZ
+  
+                  [/var/log/ecs/audit.log]
+                  file = /var/log/ecs/audit.log.*
+                  log_group_name = ${Cluster}-/var/log/ecs/audit.log
+                  log_stream_name = ${Cluster}
+                  datetime_format = %Y-%m-%dT%H:%M:%SZ
+  
+            services:
+              sysvinit:
+                cfn-hup:
+                  enabled: true
+                  ensureRunning: true
+                  files:
+                    - /etc/cfn/cfn-hup.conf
+                    - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+                awslogs:
+                  enabled: true
+                  ensureRunning: true
+                  files:
+                    - /etc/awslogs/awslogs.conf
+                    - /etc/awslogs/awscli.conf
+  
+    NodeLoadBalancer:
+      Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+      Properties:
+        Name: !Sub ${AWS::StackName}-NLB
+        Type: network
+        Scheme: internet-facing
+        Subnets: !Ref Subnets
+        Tags: 
+          - Key: Name
+            Value: !Sub ${AWS::StackName}-NLB
+  
+    NodeTargetGroup:
+      Type: AWS::ElasticLoadBalancingV2::TargetGroup
+      DependsOn: NodeLoadBalancer
+      Properties:
+        VpcId: !Ref VPC
+        Port: !Ref RpcPort
+        Protocol: TCP
+        TargetGroupAttributes:
+          - Key: deregistration_delay.timeout_seconds
+            Value: 120
+  
+    NodeListener:
+      Type: AWS::ElasticLoadBalancingV2::Listener
+      Properties: 
+        DefaultActions:
+          - Type: forward
+            TargetGroupArn: !Ref NodeTargetGroup
+        LoadBalancerArn: !Ref NodeLoadBalancer
+        Port: !Ref RpcPort
+        Protocol: TCP
+  
+    # This IAM Role is attached to all of the ECS hosts. It is based on the default role
+    # published here:
+    # http://docs.aws.amazon.com/AmazonECS/latest/developerguide/instance_IAM_role.html
+    #
+    # You can add other IAM policy statements here to allow access from your ECS hosts
+    # to other AWS services.
+  
+    ECSRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /
+        RoleName: !Sub ${AWS::StackName}-ECSRole-${AWS::Region}
+        AssumeRolePolicyDocument: |
+          {
+            "Statement": [{
+              "Action": "sts:AssumeRole",
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              }
+            }]
+          }
+        Policies:
+          - PolicyName: ecs-service
+            PolicyDocument: |
+              {
+                "Statement": [{
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecs:CreateCluster",
+                    "ecs:DeregisterContainerInstance",
+                    "ecs:DiscoverPollEndpoint",
+                    "ecs:Poll",
+                    "ecs:RegisterContainerInstance",
+                    "ecs:StartTelemetrySession",
+                    "ecs:Submit*",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:BatchGetImage",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:GetAuthorizationToken",
+                    "ssm:DescribeAssociation",
+                    "ssm:GetDeployablePatchSnapshotForInstance",
+                    "ssm:GetDocument",
+                    "ssm:GetManifest",
+                    "ssm:GetParameters",
+                    "ssm:ListAssociations",
+                    "ssm:ListInstanceAssociations",
+                    "ssm:PutInventory",
+                    "ssm:PutComplianceItems",
+                    "ssm:PutConfigurePackageResult",
+                    "ssm:PutParameter",
+                    "ssm:UpdateAssociationStatus",
+                    "ssm:UpdateInstanceAssociationStatus",
+                    "ssm:UpdateInstanceInformation",
+                    "ec2messages:AcknowledgeMessage",
+                    "ec2messages:DeleteMessage",
+                    "ec2messages:FailMessage",
+                    "ec2messages:GetEndpoint",
+                    "ec2messages:GetMessages",
+                    "ec2messages:SendReply",
+                    "cloudwatch:PutMetricData",
+                    "ec2:DescribeInstanceStatus",
+                    "ds:CreateComputer",
+                    "ds:DescribeDirectories",
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:DescribeLogGroups",
+                    "logs:DescribeLogStreams",
+                    "logs:PutLogEvents",
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject",
+                    "s3:AbortMultipartUpload",
+                    "s3:ListMultipartUploadParts",
+                    "s3:ListBucket",
+                    "s3:ListBucketMultipartUploads",
+                    "firehose:PutRecord",
+                    "firehose:PutRecordBatch",
+                    "ec2:DescribeAddresses",
+                    "ec2:DescribeInstances",
+                    "ec2:AssociateAddress"
+                  ],
+                  "Resource": "*"
+                }]
+              }
+  
+    ECSInstanceProfile:
+      Type: AWS::IAM::InstanceProfile
+      Properties:
+        Path: /
+        Roles:
+          - !Ref ECSRole
+  
+    ECSServiceAutoScalingRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - application-autoscaling.amazonaws.com
+        Path: /
+        Policies:
+          - PolicyName: ecs-service-autoscaling
+            PolicyDocument:
+              Statement:
+                Effect: Allow
+                Action:
+                - application-autoscaling:*
+                - cloudwatch:DescribeAlarms
+                - cloudwatch:PutMetricAlarm
+                - ecs:DescribeServices
+                - ecs:UpdateService
+                Resource: "*"
+  
+    NodeTaskExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Action: sts:AssumeRole
+              Effect: Allow
+              Principal:
+                Service: ecs-tasks.amazonaws.com
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+        Policies:
+          - PolicyName: !Sub ecs-task-S3-${AWS::StackName}
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                -
+                  Effect: Allow
+                  Action:
+                    - "s3:Get*"
+                    - "s3:List*"
+                  Resource:
+                    - Fn::Join:
+                      - ""
+                      -
+                        - "arn:aws:s3:::"
+                        - !FindInMap
+                          - RegionMap
+                          - !Ref 'AWS::Region'
+                          - !Ref Network
+          - PolicyName: puttofirehose
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - firehose:PutRecord
+                    - firehose:PutRecordBatch
+                  Resource:
+                    - !GetAtt 'PeerAnalyticsStream.Arn'
+  
+    NodeLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: !Sub /ecs/${AWS::StackName}-node
+        RetentionInDays: 14
+  
+    NodeECSService:
+      Type: AWS::ECS::Service
+      DependsOn: NodeListener
+      Properties:
+        Cluster: !Ref Cluster
+        DesiredCount: !Ref NodeDesiredCount
+        HealthCheckGracePeriodSeconds: 3600
+        TaskDefinition: !Ref NodeTaskDefinition
+        LaunchType: EC2
+        DeploymentConfiguration:
+          MaximumPercent: 133
+          MinimumHealthyPercent: 66
+        LoadBalancers: 
+          - ContainerName: !Ref NodeTaskName
+            ContainerPort: !Ref RpcPort
+            TargetGroupArn: !Ref NodeTargetGroup
+  
+    NodeTaskDefinition:
+      Type: AWS::ECS::TaskDefinition
+      Properties:
+        Family: !Ref NodeTaskName
+        RequiresCompatibilities:
+          - EC2
+        NetworkMode: host
+        ExecutionRoleArn: !Ref NodeTaskExecutionRole
+        ContainerDefinitions:
+          - Name: !Ref NodeTaskName
+            Image: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NodeRepository}
+            Essential: true
+            MemoryReservation: 6144
+            Environment:
+              - Name: "region"
+                Value: !Ref AWS::Region
+              - Name: "nodeaddr"
+                Value: !Ref NodeAddress
+              - Name: "rpcport"
+                Value: !Ref RpcPort
+              - Name: "netport"
+                Value: !Ref NetPort
+              - Name: "chainbucket"
+                Value: !FindInMap
+                  - RegionMap
+                  - !Ref 'AWS::Region'
+                  - !Ref Network
+              - Name: "s3key"
+                Value: node
+              - Name: "analytics"
+                Value: !Ref PeerAnalyticsStream
+            PortMappings:
+              - ContainerPort: !Ref RpcPort
+              - ContainerPort: !Ref NetPort
+            LogConfiguration:
+              LogDriver: awslogs
+              Options:
+                awslogs-region: !Ref AWS::Region
+                awslogs-group: !Ref NodeLogGroup
+                awslogs-stream-prefix: !Ref AWS::StackName
+            HealthCheck:
+              Command:
+                - CMD-SHELL
+                - python /home/tezos/utc-time-math.py `curl --silent http://127.0.0.1:8732/monitor/bootstrapped|jq -r .timestamp` `date -u +%Y-%m-%dT%H:%M:%SZ` 7200 || exit 1
+              Interval: 300
+              Timeout: 60
+              Retries: 10
+              StartPeriod: 300
+  
+  # CodePipeline Resources
+  
+    NodeRepository:
+      Type: AWS::ECR::Repository
+  
+    NodeCodeBuildServiceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: codebuild.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: root
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Resource: "*"
+                  Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                    - ecr:GetAuthorizationToken
+                - Resource: !Sub arn:aws:s3:::${NodeArtifactBucket}/*
+                  Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:PutObject
+                    - s3:GetObjectVersion
+                - Resource: !Sub arn:aws:ecr:${AWS::Region}:${AWS::AccountId}:repository/${NodeRepository}
+                  Effect: Allow
+                  Action:
+                    - ecr:GetDownloadUrlForLayer
+                    - ecr:BatchGetImage
+                    - ecr:BatchCheckLayerAvailability
+                    - ecr:PutImage
+                    - ecr:InitiateLayerUpload
+                    - ecr:UploadLayerPart
+                    - ecr:CompleteLayerUpload
+  
+    NodeCodePipelineServiceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        Path: /
+        AssumeRolePolicyDocument:
+          Version: 2012-10-17
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: codepipeline.amazonaws.com
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: root
+            PolicyDocument:
+              Version: 2012-10-17
+              Statement:
+                - Resource:
+                    - !Sub arn:aws:s3:::${NodeArtifactBucket}/*
+                  Effect: Allow
+                  Action:
+                    - s3:PutObject
+                    - s3:GetObject
+                    - s3:GetObjectVersion
+                    - s3:GetBucketVersioning
+                - Resource: "*"
+                  Effect: Allow
+                  Action:
+                    - ecs:DescribeServices
+                    - ecs:DescribeTaskDefinition
+                    - ecs:DescribeTasks
+                    - ecs:ListTasks
+                    - ecs:RegisterTaskDefinition
+                    - ecs:UpdateService
+                    - codebuild:StartBuild
+                    - codebuild:BatchGetBuilds
+                    - iam:PassRole
+  
+    NodeArtifactBucket:
+      Type: AWS::S3::Bucket
+  
+    NodeCodeBuildProject:
+      Type: AWS::CodeBuild::Project
+      Properties:
+        Artifacts:
+          Type: CODEPIPELINE
+        Source:
+          Type: CODEPIPELINE
+          BuildSpec: |
+            version: 0.2
+            phases:
+              pre_build:
+                commands:
+                  - $(aws ecr get-login --no-include-email)
+                  - TAG="$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | head -c 8)"
+                  - IMAGE_URI="${REPOSITORY_URI}:${TAG}"
+              build:
+                commands:
+                  - docker build --tag "$IMAGE_URI" .
+                  - docker build --tag "${REPOSITORY_URI}:latest" .
+              post_build:
+                commands:
+                  - docker push "$IMAGE_URI"
+                  - docker push "${REPOSITORY_URI}:latest"
+                  - printf '[{"name":"tezos-node","imageUri":"%s"}]' "$IMAGE_URI" > images.json
+            artifacts:
+              files: images.json
+        Environment:
+          ComputeType: BUILD_GENERAL1_SMALL
+          Image: aws/codebuild/docker:17.09.0
+          Type: LINUX_CONTAINER
+          EnvironmentVariables:
+            - Name: AWS_DEFAULT_REGION
+              Value: !Ref AWS::Region
+            - Name: REPOSITORY_URI
+              Value: !Sub ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${NodeRepository}
+        Name: !Sub ${AWS::StackName}-node
+        ServiceRole: !Ref NodeCodeBuildServiceRole
+  
+    NodePipeline:
+      Type: AWS::CodePipeline::Pipeline
+      Properties:
+        RoleArn: !GetAtt NodeCodePipelineServiceRole.Arn
+        ArtifactStore:
+          Type: S3
+          Location: !Ref NodeArtifactBucket
+        Stages:
+          - Name: Source
+            Actions:
+              - Name: App
+                ActionTypeId:
+                  Category: Source
+                  Owner: ThirdParty
+                  Version: 1
+                  Provider: GitHub
+                Configuration:
+                  Owner: !Ref GitHubUser
+                  Repo: !Ref NodeGitHubRepo
+                  Branch: !Ref NodeGitHubBranch
+                  OAuthToken: !Ref GitHubToken
+                OutputArtifacts:
+                  - Name: App
+                RunOrder: 1
+          - Name: Build
+            Actions:
+              - Name: Build
+                ActionTypeId:
+                  Category: Build
+                  Owner: AWS
+                  Version: 1
+                  Provider: CodeBuild
+                Configuration:
+                  ProjectName: !Ref NodeCodeBuildProject
+                InputArtifacts:
+                  - Name: App
+                OutputArtifacts:
+                  - Name: BuildOutput
+                RunOrder: 1
+          - Name: Deploy
+            Actions:
+              - Name: Deploy
+                ActionTypeId:
+                  Category: Deploy
+                  Owner: AWS
+                  Version: 1
+                  Provider: ECS
+                Configuration:
+                  ClusterName: !Ref Cluster
+                  ServiceName: !Ref NodeECSService
+                  FileName: images.json
+                InputArtifacts:
+                  - Name: BuildOutput
+                RunOrder: 1
+  
+  # SNS Resources
+  
+    # SNSTopic:
+    #   Type: AWS::SNS::Topic
+    #   Properties: 
+    #     DisplayName: String
+    #     Subscription:
+    #       -
+    #         Endpoint: !Ref SNSSubscriptionEndpoint
+    #         Protocol: !Ref SNSSubscriptionProtocol
+    #     TopicName: !Ref AWS::StackName
+  
+  # CloudWatch Resources
+  
+    # CPUAlarm:
+    #   Type: AWS::CloudWatch::Alarm
+    #   Properties:
+    #     AlarmName: !Sub ${AWS::StackName} average CPU utilization greater than threshold.
+    #     AlarmDescription: Alarm if CPU utilization is greater than threshold.
+    #     Namespace: AWS/ECS
+    #     MetricName: CPUUtilization
+    #     Dimensions:
+    #     - Name: ClusterName
+    #       Value: !Ref Cluster
+    #     Statistic: Average
+    #     Period: '60'
+    #     EvaluationPeriods: '3'
+    #     Threshold: !Ref CPUAlarmThreshold 
+    #     ComparisonOperator: GreaterThanThreshold
+    #     AlarmActions:
+    #     - Ref: SNSTopic
+    #     OKActions:
+    #     - Ref: SNSTopic
+  
+    # MemoryAlarm:
+    #   Type: AWS::CloudWatch::Alarm
+    #   Properties:
+    #     AlarmName: !Sub ${AWS::StackName} average memory utilization greater than threshold.
+    #     AlarmDescription: Alarm if memory utilization is greater than threshold.
+    #     Namespace: AWS/ECS
+    #     MetricName: MemoryUtilization
+    #     Dimensions:
+    #     - Name: ClusterName
+    #       Value: !Ref Cluster
+    #     Statistic: Average
+    #     Period: '60'
+    #     EvaluationPeriods: '3'
+    #     Threshold: !Ref MemoryAlarmThreshold 
+    #     ComparisonOperator: GreaterThanThreshold
+    #     AlarmActions:
+    #     - Ref: SNSTopic
+    #     OKActions:
+    #     - Ref: SNSTopic  
+  
+    # HealthyHostAlarm:
+    #   Type: 'AWS::CloudWatch::Alarm'
+    #   Properties:
+    #     AlarmName: !Sub ${AWS::StackName} alarm no healthy hosts connected to ELB.
+    #     AlarmDescription: Alarm if no healthy hosts connected to ELB.
+    #     MetricName: HealthyHostCount
+    #     Namespace: AWS/NetworkELB
+    #     Statistic: Average
+    #     Period: '60'
+    #     EvaluationPeriods: '3'
+    #     Threshold: '1'
+    #     ComparisonOperator: LessThanThreshold
+    #     Dimensions:
+    #       - Name: TargetGroup
+    #         Value: !GetAtt NodeTargetGroup.TargetGroupFullName
+    #       - Name: LoadBalancer
+    #         Value: !GetAtt NodeLoadBalancer.LoadBalancerFullName
+    #     AlarmActions:
+    #       - Ref: SNSTopic
+    #     OKActions:
+    #       - Ref: SNSTopic
+  
+  Outputs:
+    ClusterName:
+        Value: !Ref Cluster
+    NodeService:
+      Value: !Ref NodeECSService
+    NodePipelineUrl:
+      Value: !Sub https://console.aws.amazon.com/codepipeline/home?region=${AWS::Region}#/view/${NodePipeline}
+    NodeTargetGroup:
+      Value: !Ref NodeTargetGroup
+    NodeServiceUrl:
+      Description: URL of the load balancer for the node service.
+      Value: !Sub http://${NodeLoadBalancer.DNSName}
+  
