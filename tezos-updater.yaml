@@ -11,7 +11,7 @@ Parameters:
 
   GitHubUser:
     Type: String
-    Default: tacoinfra
+    Default: tqtezos
     Description: Your team or username on GitHub.
 
   GitHubRepo:
@@ -21,7 +21,7 @@ Parameters:
 
   GitHubBranch:
     Type: String
-    Default: master
+    Default: alphanet
     Description: The branch of the repo to continuously deploy.
 
   GitHubToken:
