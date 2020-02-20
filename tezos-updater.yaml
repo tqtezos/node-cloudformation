@@ -40,7 +40,7 @@ Parameters:
 
   VpcCIDR:
     Type: String
-    Default: 10.0.0.0/16
+    Default: 10.190.0.0/16
 
 # ECS Parameters
 

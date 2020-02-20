@@ -70,7 +70,7 @@
   
     VpcCIDR:
       Type: String
-      Default: 10.200.0.0/16
+      Default: 10.190.0.0/16
   
   # ECS Parameters
   
@@ -145,11 +145,11 @@
   
     Network:
       Type: String
-      Default: alphanet
+      Default: testnet
       AllowedValues:
         - mainnetsnapshot
         - mainnet
-        - alphanet
+        - testnet
         - zeronet
   
   Metadata:
@@ -195,7 +195,7 @@
         NetPort:
           default: "The TCP port used for connectivity to other Tezos peer nodes"
         Network:
-          default: "The Tezos network you will be connecting to (zeronet, alphanet, or mainnet)"
+          default: "The Tezos network you will be connecting to (zeronet, testnet, or mainnet)"
       ParameterGroups:
         - Label:
             default: GitHub Configuration
@@ -249,7 +249,7 @@
         mainnetsnapshot: mainnet-updater-snapshot-chainbucket-rhoe29oxxq0c
         mainnet: mainnet-updater-chainbucket-vwnool266emk
         zeronet: zeronet-updater-chainbucket-kmmayerx0l8v
-        alphanet: alphanet-updater-chainbucket-1v6go885nadpa
+        testnet: alphanet-updater-chainbucket-1v6go885nadpa
       eu-central-1:
         mainnetsnapshot: mainnet-updater-snapshot-chainbucket-pq4rbmykvmc5
         mainnet: mainnet-updater-chainbucket-1xqr2mulio9ji
@@ -261,7 +261,7 @@
         mainnet: mainnet-updater-chainbucket-grzvkc3i3syo
       us-west-2:
         mainnet: mainnet-updater-chainbucket-1eq4z7ed2l45s
-        alphanet: testnet-updater-chainbucket-167t5ylzl69jf
+        testnet: testnet-updater-chainbucket-167t5ylzl69jf
       us-east-2:
         mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
   
