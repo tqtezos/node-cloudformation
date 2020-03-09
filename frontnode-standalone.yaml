@@ -87,7 +87,7 @@
   
     ClusterSize:
       Type: Number
-      Default: 5
+      Default: 2
   
     Bandwidth:
       Type: Number
@@ -130,10 +130,6 @@
       Default: 80
   
   # Tezos Parameters
-  
-    NodeAddress:
-      Type: String
-      Default: bootzero.tzbeta.net
   
     RpcPort:
       Type: Number
@@ -188,8 +184,6 @@
           default: "The name of the node ECS Task"
         ECSAMI:
           default: "The ECS AMI ID populated from SSM."
-        NodeAddress:
-          default: "The DNS hostname of the Tezos node(s)"
         RpcPort:
           default: "The RPC port used for communication with the local Tezos node"
         NetPort:
@@ -225,7 +219,6 @@
         - Label:
             default: Tezos Configuration
           Parameters:
-            - NodeAddress
             - RpcPort
             - NetPort
             - Network
@@ -261,7 +254,7 @@
         mainnet: mainnet-updater-chainbucket-grzvkc3i3syo
       us-west-2:
         mainnet: mainnet-updater-chainbucket-1eq4z7ed2l45s
-        testnet: testnet-updater-chainbucket-167t5ylzl69jf
+        testnet: testnet-updater-chainbucket-17s4wyjyve9fl
       us-east-2:
         mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
   
@@ -777,8 +770,6 @@
             Environment:
               - Name: "region"
                 Value: !Ref AWS::Region
-              - Name: "nodeaddr"
-                Value: !Ref NodeAddress
               - Name: "rpcport"
                 Value: !Ref RpcPort
               - Name: "netport"
