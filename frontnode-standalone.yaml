@@ -254,7 +254,7 @@
         mainnet: mainnet-updater-chainbucket-grzvkc3i3syo
       us-west-2:
         mainnet: mainnet-updater-chainbucket-1eq4z7ed2l45s
-        testnet: testnet-updater-chainbucket-17s4wyjyve9fl
+        testnet: tezos-updater-chainbucket-3i9ysp06u91i
       us-east-2:
         mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
   
