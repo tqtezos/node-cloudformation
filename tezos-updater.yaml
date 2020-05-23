@@ -40,7 +40,7 @@ Parameters:
 
   VpcCIDR:
     Type: String
-    Default: 10.190.0.0/16
+    Default: 10.100.0.0/16
 
 # ECS Parameters
 
@@ -77,6 +77,17 @@ Parameters:
     Type: Number
     Default: 9732
 
+  Network:
+    Type: String
+    Default: testnet
+    AllowedValues:
+        - mainnet
+        - testnet
+
+  Connections:
+    Type: Number
+    Default: 40
+
 Metadata:
 
   AWS::CloudFormation::Interface:
@@ -111,6 +122,10 @@ Metadata:
         default: "The RPC port used for communication with the local Tezos baker node"
       NetPort:
         default: "The TCP port used for baker connectivity to other Tezos peer nodes"
+      Network:
+        default: "The Tezos network you will be connecting to (testnet or mainnet)"
+      Connections:
+        default: "The number of peers the Tezos node will attempt to connect to"
     ParameterGroups:
       - Label:
           default: GitHub Configuration
@@ -139,6 +154,18 @@ Metadata:
         Parameters:
           - RpcPort
           - NetPort
+          - Network
+          - Connections
+
+# Mappings
+
+Mappings:
+
+  NetworkMap:
+    mainnet:
+      netname: mainnet
+    testnet:
+      netname: carthagenet # This value is passed to the node during configuration, update when testnet changes
 
 Resources:
 
@@ -558,6 +585,13 @@ Resources:
               Value: !Ref AWS::Region
             - Name: "chainbucket"
               Value: !Ref ChainBucket
+            - Name: "network"
+              Value: !FindInMap
+                - NetworkMap
+                - !Ref Network
+                - netname
+            - Name: "connections"
+              Value: !Ref Connections
             - Name: "s3key"
               Value: node
           PortMappings:
@@ -568,14 +602,6 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: !Ref AWS::StackName
-          #HealthCheck:
-          #  Command:
-          #    - CMD-SHELL
-          #    - python /home/tezos/utc-time-math.py `curl --silent http://127.0.0.1:8732/monitor/bootstrapped|jq -r .timestamp` `date -u +%Y-%m-%dT%H:%M:%SZ` 16000 || exit 1
-          #  Interval: 300
-          #  Timeout: 60
-          #  Retries: 10
-          #  StartPeriod: 300
 
 # CodePipeline Resources
 

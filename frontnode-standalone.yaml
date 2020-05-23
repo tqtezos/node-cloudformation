@@ -1,36 +1,6 @@
 ---
   AWSTemplateFormatVersion: 2010-09-09
   
-  # Frontnode EIPs:
-  
-  # Development/Zeronet:
-  # 34.255.229.229 2a05:d018:f2:fc01:85ca:b2ed:39dc:3174
-  # 34.255.140.16 2a05:d018:f2:fc02:222a:2ad6:2230:bf1c
-  # 34.255.244.4 2a05:d018:f2:fc03:e8ff:b3c7:7305:110c
-  # 34.243.215.49 2a05:d018:f2:fc03:6146:40df:ce95:bce2
-  # 34.255.244.144 2a05:d018:f2:fc01:788d:2a64:9090:19e2
-  
-  # Staging/Alphanet:
-  # 34.249.109.84 2a05:d018:791:4602:c59e:148c:7d1a:5e2c
-  # 34.253.64.43 2a05:d018:791:4603:e008:bd0:909b:35f7
-  # 34.255.45.149 2a05:d018:791:4602:b5c6:8740:2662:e3bd
-  # 34.255.45.196 2a05:d018:791:4603:36f8:57df:5b99:4bac
-  # 52.50.125.15 2a05:d018:791:4603:3938:ca03:a3a:1a7e
-  
-  # Mainnet/Ireland:
-  # 34.246.245.155 2a05:d018:619:5802:78f7:8f07:a450:b1f3
-  # 34.250.42.106 2a05:d018:619:5802:879b:ee1e:cf1f:17a5
-  # 34.252.42.102 2a05:d018:619:5803:e823:8d86:7ef4:ef5d
-  # 34.254.102.12 2a05:d018:619:5801:fb14:d429:24a4:26e2
-  # 34.255.45.216 2a05:d018:619:5801:8e33:a3a7:f2c5:f41c
-  
-  # Mainnet/Oregon:
-  # 52.35.49.208 2600:1f14:a74:a003:884e:532b:9bbe:6179
-  # 34.214.94.76 2600:1f14:a74:a001:8021:96f4:9e6a:ac15
-  # 34.208.149.159 2600:1f14:a74:a003:d297:b833:e4ae:4d15
-  # 34.216.135.4 2600:1f14:a74:a002:e0ad:d64:e46f:935c
-  # 34.215.147.163 2600:1f14:a74:a002:6102:d29c:73bb:14d8
-  
   Description: >
     This template creates an automated continuous deployment pipeline to Amazon Elastic Container Service (ECS)
     Created by Luke Youngblood, luke@blockscale.net
@@ -70,7 +40,7 @@
   
     VpcCIDR:
       Type: String
-      Default: 10.190.0.0/16
+      Default: 10.100.0.0/16
   
   # ECS Parameters
   
@@ -89,14 +59,6 @@
       Type: Number
       Default: 2
   
-    Bandwidth:
-      Type: Number
-      Default: 2048
-  
-    BandwidthCeiling:
-      Type: Number
-      Default: 4096
-  
     NodeDesiredCount:
       Type: Number
       Default: 0
@@ -108,26 +70,6 @@
     ECSAMI:
       Type: AWS::SSM::Parameter::Value<String>
       Default: /aws/service/ecs/optimized-ami/amazon-linux/recommended/image_id
-  
-  # SNS Parameters
-  
-    SNSSubscriptionEndpoint:
-      Type: String
-      Default: https://events.pagerduty.com/integration/6c1aff6f4d8b4cd79144ee95c383d6d6/enqueue
-  
-    SNSSubscriptionProtocol:
-      Type: String
-      Default: HTTPS
-  
-  # CloudWatch Alarm Parameters
-  
-    CPUAlarmThreshold:
-      Type: Number
-      Default: 80
-  
-    MemoryAlarmThreshold:
-      Type: Number
-      Default: 80
   
   # Tezos Parameters
   
@@ -143,10 +85,12 @@
       Type: String
       Default: testnet
       AllowedValues:
-        - mainnetsnapshot
         - mainnet
         - testnet
-        - zeronet
+
+    Connections:
+      Type: Number
+      Default: 40
   
   Metadata:
   
@@ -174,10 +118,6 @@
           default: "How many ECS hosts do you want to initially deploy?"
         SpotPrice:
           default: "The maximum spot price to pay for instances - this should normally be set to the on demand price."
-        Bandwidth:
-          default: "How much bandwidth, in kb/sec., should be allocated to Tezos peers (upload) per EC2 instance"
-        BandwidthCeiling:
-          default: "How much bandwidth, in kb/sec., should be allocated to Tezos peers as a ceiling (max. upload)"
         NodeDesiredCount:
           default: "How many ECS Tasks do you want to initially execute?"
         NodeTaskName:
@@ -189,7 +129,9 @@
         NetPort:
           default: "The TCP port used for connectivity to other Tezos peer nodes"
         Network:
-          default: "The Tezos network you will be connecting to (zeronet, testnet, or mainnet)"
+          default: "The Tezos network you will be connecting to (testnet or mainnet)"
+        Connections:
+          default: "The number of peers the Tezos node will attempt to connect to"
       ParameterGroups:
         - Label:
             default: GitHub Configuration
@@ -211,8 +153,6 @@
             - KeyPair
             - SpotPrice
             - ClusterSize
-            - Bandwidth
-            - BandwidthCeiling
             - NodeDesiredCount
             - NodeTaskName
             - ECSAMI
@@ -222,97 +162,36 @@
             - RpcPort
             - NetPort
             - Network
-        - Label:
-            default: SNS Configuration
-          Parameters:
-            - SNSSubscriptionEndpoint
-            - SNSSubscriptionProtocol
-        - Label:
-            default: CloudWatch Alarms Configuration
-          Parameters:
-            - CPUAlarmThreshold
-            - MemoryAlarmThreshold
+            - Connections
   
   # Mappings
   
   Mappings:
+
+    NetworkMap:
+      mainnet:
+        netname: mainnet
+      testnet:
+        netname: carthagenet # This value is passed to the node during configuration, update when testnet changes
   
     RegionMap:
       eu-west-1:
-        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-rhoe29oxxq0c
         mainnet: mainnet-updater-chainbucket-vwnool266emk
-        zeronet: zeronet-updater-chainbucket-kmmayerx0l8v
         testnet: alphanet-updater-chainbucket-1v6go885nadpa
       eu-central-1:
-        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-pq4rbmykvmc5
-        mainnet: mainnet-updater-chainbucket-1xqr2mulio9ji
+        mainnet: mainnet-updater-snapshot-chainbucket-pq4rbmykvmc5
       ap-southeast-1:
-        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-195c5u73nminm
-        mainnet: mainnet-updater-chainbucket-1sdwkmqkck157
+        mainnet: mainnet-updater-snapshot-chainbucket-195c5u73nminm
       ap-northeast-1:
-        mainnetsnapshot: mainnet-updater-snapshot-chainbucket-sm0xec0cdesk
-        mainnet: mainnet-updater-chainbucket-grzvkc3i3syo
+        mainnet: mainnet-updater-snapshot-chainbucket-sm0xec0cdesk
       us-west-2:
         mainnet: mainnet-updater-chainbucket-1eq4z7ed2l45s
         testnet: tezos-updater-chainbucket-3i9ysp06u91i
       us-east-2:
         mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
+        testnet: tq-updater-chainbucket-1v593806mtus
   
   Resources:
-  
-  # Kinesis Resources
-  
-    DeliveryStreamRole:
-      Type: AWS::IAM::Role
-      Properties:
-        AssumeRolePolicyDocument:
-          Version: '2012-10-17'
-          Statement:
-            - Effect: Allow
-              Principal:
-                Service:
-                  - firehose.amazonaws.com
-              Action:
-                - sts:AssumeRole
-        Policies:
-          - PolicyName: s3Access
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Sid: ''
-                  Effect: Allow
-                  Action:
-                    - s3:AbortMultipartUpload
-                    - s3:GetBucketLocation
-                    - s3:GetObject
-                    - s3:ListBucket
-                    - s3:ListBucketMultipartUploads
-                    - s3:PutObject
-                  Resource:
-                    - !Sub '${PeerAnalyticsBucket.Arn}'
-                    - !Sub '${PeerAnalyticsBucket.Arn}/*'
-                - Sid: ''
-                  Effect: Allow
-                  Action:
-                    - logs:PutLogEvents
-                  Resource:
-                    - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/kinesisfirehose/*:log-stream:*'
-  
-    PeerAnalyticsStream:
-      Type: AWS::KinesisFirehose::DeliveryStream
-      Properties:
-        DeliveryStreamType: DirectPut
-        S3DestinationConfiguration:
-          BucketARN: !Sub '${PeerAnalyticsBucket.Arn}'
-          BufferingHints:
-            IntervalInSeconds: 60
-            SizeInMBs: 5
-          CompressionFormat: GZIP
-          RoleARN: !GetAtt 'DeliveryStreamRole.Arn'
-  
-    PeerAnalyticsBucket:
-      Type: AWS::S3::Bucket
-      DeletionPolicy: Retain
   
   # ECS Resources
   
@@ -379,7 +258,8 @@
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyPair
         AssociatePublicIpAddress: True
-  #      SpotPrice: !Ref SpotPrice
+# Note: Uncomment the following line if you would prefer to use spot instances for your nodes
+#        SpotPrice: !Ref SpotPrice
         SecurityGroups:
           - !Ref SecurityGroup
         IamInstanceProfile: !Ref ECSInstanceProfile
@@ -425,11 +305,6 @@
   
             # Make raid appear on reboot
             echo "/dev/md0 $mount_point ext4 noatime 0 0" | tee -a /etc/fstab
-  
-            # Set Linux traffic control to limit outbound bandwidth usage of peering
-            #tc qdisc add dev eth0 root handle 1:0 htb default 1
-            #tc class add dev eth0 parent 1:0 classid 1:10 htb rate ${Bandwidth}kbit ceil {BandwidthCeiling}kbit prio 0
-            #tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dport 9732 0xffff flowid 1:10
   
             /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
             /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
@@ -720,16 +595,6 @@
                           - RegionMap
                           - !Ref 'AWS::Region'
                           - !Ref Network
-          - PolicyName: puttofirehose
-            PolicyDocument:
-              Version: '2012-10-17'
-              Statement:
-                - Effect: Allow
-                  Action:
-                    - firehose:PutRecord
-                    - firehose:PutRecordBatch
-                  Resource:
-                    - !GetAtt 'PeerAnalyticsStream.Arn'
   
     NodeLogGroup:
       Type: AWS::Logs::LogGroup
@@ -779,10 +644,15 @@
                   - RegionMap
                   - !Ref 'AWS::Region'
                   - !Ref Network
+              - Name: "network"
+                Value: !FindInMap
+                  - NetworkMap
+                  - !Ref Network
+                  - netname
+              - Name: "connections"
+                Value: !Ref Connections
               - Name: "s3key"
                 Value: node
-              - Name: "analytics"
-                Value: !Ref PeerAnalyticsStream
             PortMappings:
               - ContainerPort: !Ref RpcPort
               - ContainerPort: !Ref NetPort
@@ -978,82 +848,6 @@
                 InputArtifacts:
                   - Name: BuildOutput
                 RunOrder: 1
-  
-  # SNS Resources
-  
-    # SNSTopic:
-    #   Type: AWS::SNS::Topic
-    #   Properties: 
-    #     DisplayName: String
-    #     Subscription:
-    #       -
-    #         Endpoint: !Ref SNSSubscriptionEndpoint
-    #         Protocol: !Ref SNSSubscriptionProtocol
-    #     TopicName: !Ref AWS::StackName
-  
-  # CloudWatch Resources
-  
-    # CPUAlarm:
-    #   Type: AWS::CloudWatch::Alarm
-    #   Properties:
-    #     AlarmName: !Sub ${AWS::StackName} average CPU utilization greater than threshold.
-    #     AlarmDescription: Alarm if CPU utilization is greater than threshold.
-    #     Namespace: AWS/ECS
-    #     MetricName: CPUUtilization
-    #     Dimensions:
-    #     - Name: ClusterName
-    #       Value: !Ref Cluster
-    #     Statistic: Average
-    #     Period: '60'
-    #     EvaluationPeriods: '3'
-    #     Threshold: !Ref CPUAlarmThreshold 
-    #     ComparisonOperator: GreaterThanThreshold
-    #     AlarmActions:
-    #     - Ref: SNSTopic
-    #     OKActions:
-    #     - Ref: SNSTopic
-  
-    # MemoryAlarm:
-    #   Type: AWS::CloudWatch::Alarm
-    #   Properties:
-    #     AlarmName: !Sub ${AWS::StackName} average memory utilization greater than threshold.
-    #     AlarmDescription: Alarm if memory utilization is greater than threshold.
-    #     Namespace: AWS/ECS
-    #     MetricName: MemoryUtilization
-    #     Dimensions:
-    #     - Name: ClusterName
-    #       Value: !Ref Cluster
-    #     Statistic: Average
-    #     Period: '60'
-    #     EvaluationPeriods: '3'
-    #     Threshold: !Ref MemoryAlarmThreshold 
-    #     ComparisonOperator: GreaterThanThreshold
-    #     AlarmActions:
-    #     - Ref: SNSTopic
-    #     OKActions:
-    #     - Ref: SNSTopic  
-  
-    # HealthyHostAlarm:
-    #   Type: 'AWS::CloudWatch::Alarm'
-    #   Properties:
-    #     AlarmName: !Sub ${AWS::StackName} alarm no healthy hosts connected to ELB.
-    #     AlarmDescription: Alarm if no healthy hosts connected to ELB.
-    #     MetricName: HealthyHostCount
-    #     Namespace: AWS/NetworkELB
-    #     Statistic: Average
-    #     Period: '60'
-    #     EvaluationPeriods: '3'
-    #     Threshold: '1'
-    #     ComparisonOperator: LessThanThreshold
-    #     Dimensions:
-    #       - Name: TargetGroup
-    #         Value: !GetAtt NodeTargetGroup.TargetGroupFullName
-    #       - Name: LoadBalancer
-    #         Value: !GetAtt NodeLoadBalancer.LoadBalancerFullName
-    #     AlarmActions:
-    #       - Ref: SNSTopic
-    #     OKActions:
-    #       - Ref: SNSTopic
   
   Outputs:
     ClusterName:
