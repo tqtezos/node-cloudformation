@@ -12,19 +12,19 @@ Parameters:
 
   VpcCIDR:
     Type: String
-    Default: 10.190.0.0/16
+    Default: 10.100.0.0/16
 
   PublicSubnet1CIDR:
     Type: String
-    Default: 10.190.10.0/24
+    Default: 10.100.10.0/24
 
   PublicSubnet2CIDR:
     Type: String
-    Default: 10.190.20.0/24
+    Default: 10.100.20.0/24
 
   PublicSubnet3CIDR:
     Type: String
-    Default: 10.190.30.0/24
+    Default: 10.100.30.0/24
 
 Metadata:
 
