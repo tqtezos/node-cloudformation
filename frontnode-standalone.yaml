@@ -189,7 +189,6 @@
         testnet: tezos-updater-chainbucket-3i9ysp06u91i
       us-east-2:
         mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
-        testnet: tq-updater-chainbucket-1v593806mtus
   
   Resources:
   
