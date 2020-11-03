@@ -88,6 +88,9 @@
         - mainnet
         - testnet
 
+    ACMCertificate:
+      Type: String
+
     Connections:
       Type: Number
       Default: 40
@@ -130,6 +133,8 @@
           default: "The TCP port used for connectivity to other Tezos peer nodes"
         Network:
           default: "The Tezos network you will be connecting to (testnet or mainnet)"
+        ACMCertificate:
+          default: "The ARN of the ACM certificate that will be used by the load balancer"
         Connections:
           default: "The number of peers the Tezos node will attempt to connect to"
       ParameterGroups:
@@ -162,6 +167,7 @@
             - RpcPort
             - NetPort
             - Network
+            - ACMCertificate
             - Connections
   
   # Mappings
@@ -439,7 +445,9 @@
             TargetGroupArn: !Ref NodeTargetGroup
         LoadBalancerArn: !Ref NodeLoadBalancer
         Port: !Ref RpcPort
-        Protocol: TCP
+        Protocol: TLS
+        Certificates:
+          - CertificateArn: !Ref ACMCertificate
   
     # This IAM Role is attached to all of the ECS hosts. It is based on the default role
     # published here:
