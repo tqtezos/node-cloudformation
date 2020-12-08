@@ -46,7 +46,7 @@
   
     InstanceType:
       Type: String
-      Default: i3.large
+      Default: i3.xlarge
   
     KeyPair:
       Type: AWS::EC2::KeyPair::KeyName
@@ -83,10 +83,11 @@
   
     Network:
       Type: String
-      Default: testnet
+      Default: delphinet
       AllowedValues:
         - mainnet
-        - testnet
+        - delphinet
+        - edonet
 
     Connections:
       Type: Number
@@ -129,7 +130,7 @@
         NetPort:
           default: "The TCP port used for connectivity to other Tezos peer nodes"
         Network:
-          default: "The Tezos network you will be connecting to (testnet or mainnet)"
+          default: "The Tezos network you will be connecting to"
         Connections:
           default: "The number of peers the Tezos node will attempt to connect to"
       ParameterGroups:
@@ -167,17 +168,12 @@
   # Mappings
   
   Mappings:
-
-    NetworkMap:
-      mainnet:
-        netname: mainnet
-      testnet:
-        netname: carthagenet # This value is passed to the node during configuration, update when testnet changes
   
     RegionMap:
       eu-west-1:
         mainnet: mainnet-updater-chainbucket-vwnool266emk
-        testnet: alphanet-updater-chainbucket-1v6go885nadpa
+        delphinet: alphanet-updater-chainbucket-1v6go885nadpa
+        edonet: zeronet-updater-chainbucket-kmmayerx0l8v
       eu-central-1:
         mainnet: mainnet-updater-snapshot-chainbucket-pq4rbmykvmc5
       ap-southeast-1:
@@ -186,7 +182,6 @@
         mainnet: mainnet-updater-snapshot-chainbucket-sm0xec0cdesk
       us-west-2:
         mainnet: mainnet-updater-chainbucket-1eq4z7ed2l45s
-        testnet: tezos-updater-chainbucket-3i9ysp06u91i
       us-east-2:
         mainnet: tezos-updater-oh-chainbucket-xq1wyfczcekl
   
@@ -644,10 +639,7 @@
                   - !Ref 'AWS::Region'
                   - !Ref Network
               - Name: "network"
-                Value: !FindInMap
-                  - NetworkMap
-                  - !Ref Network
-                  - netname
+                Value: !Ref Network
               - Name: "connections"
                 Value: !Ref Connections
               - Name: "s3key"
