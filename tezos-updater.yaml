@@ -46,7 +46,7 @@ Parameters:
 
   InstanceType:
     Type: String
-    Default: i3.large
+    Default: i3.xlarge
 
   KeyPair:
     Type: AWS::EC2::KeyPair::KeyName
@@ -79,10 +79,11 @@ Parameters:
 
   Network:
     Type: String
-    Default: testnet
+    Default: delphinet
     AllowedValues:
         - mainnet
-        - testnet
+        - delphinet
+        - edonet
 
   Connections:
     Type: Number
@@ -123,7 +124,7 @@ Metadata:
       NetPort:
         default: "The TCP port used for baker connectivity to other Tezos peer nodes"
       Network:
-        default: "The Tezos network you will be connecting to (testnet or mainnet)"
+        default: "The Tezos network you will be connecting to"
       Connections:
         default: "The number of peers the Tezos node will attempt to connect to"
     ParameterGroups:
@@ -156,16 +157,6 @@ Metadata:
           - NetPort
           - Network
           - Connections
-
-# Mappings
-
-Mappings:
-
-  NetworkMap:
-    mainnet:
-      netname: mainnet
-    testnet:
-      netname: carthagenet # This value is passed to the node during configuration, update when testnet changes
 
 Resources:
 
@@ -586,10 +577,7 @@ Resources:
             - Name: "chainbucket"
               Value: !Ref ChainBucket
             - Name: "network"
-              Value: !FindInMap
-                - NetworkMap
-                - !Ref Network
-                - netname
+              Value: !Ref Network
             - Name: "connections"
               Value: !Ref Connections
             - Name: "s3key"
