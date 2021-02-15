@@ -83,7 +83,7 @@ Parameters:
     AllowedValues:
         - mainnet
         - delphinet
-        - edonet
+        - edo2net
 
   Connections:
     Type: Number
