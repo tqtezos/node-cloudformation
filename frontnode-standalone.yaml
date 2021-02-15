@@ -87,7 +87,7 @@
       AllowedValues:
         - mainnet
         - delphinet
-        - edonet
+        - edo2net
 
     Connections:
       Type: Number
@@ -173,7 +173,7 @@
       eu-west-1:
         mainnet: mainnet-updater-chainbucket-vwnool266emk
         delphinet: alphanet-updater-chainbucket-1v6go885nadpa
-        edonet: zeronet-updater-chainbucket-kmmayerx0l8v
+        edo2net: zeronet-updater-chainbucket-kmmayerx0l8v
       eu-central-1:
         mainnet: mainnet-updater-snapshot-chainbucket-pq4rbmykvmc5
       ap-southeast-1:
